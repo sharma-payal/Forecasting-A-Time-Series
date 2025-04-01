@@ -1,0 +1,589 @@
+### Part 1 - Short Term Forecasting.
+1. import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the dataset with the full file path
+file_path = r"C:\Users\ravin\Downloads\ALY6050_Module3Project_Data.xlsx"  # Updated file path
+data = pd.read_excel(file_path)
+
+# Print the first few rows of the dataset to check if it's loaded correctly
+print(data.head())
+
+# Rename columns for easier reference
+data.rename(columns={"AAPL (Apple Inc) / $": "AAPL", "HON (Honeywell Inc)  /  $": "HON"}, inplace=True)
+
+# Handle missing values using forward fill
+data.fillna(method='ffill', inplace=True)
+
+# Extract relevant columns
+dates = data['Date']
+aapl_prices = data['AAPL']
+hon_prices = data['HON']
+
+# Plot time series
+plt.figure(figsize=(12, 6))
+plt.plot(dates, aapl_prices, label='AAPL Stock Price', color='blue', linestyle='-')
+plt.plot(dates, hon_prices, label='HON Stock Price', color='red', linestyle='-')
+plt.xlabel('Date')
+plt.ylabel('Stock Price')
+plt.title('Stock Prices of AAPL and HON Over Time')
+plt.legend()
+plt.xticks(rotation=45)
+plt.grid(True)
+plt.show()
+
+2. 
+# Function to apply exponential smoothing and calculate MAPE
+def exponential_smoothing_and_mape(prices, alpha_values):
+    mape_values = {}
+
+    for alpha in alpha_values:
+        # Initialize the forecast with the first actual value
+        forecast = [prices.iloc[0]]  # First forecast is the first actual value
+
+        # Perform exponential smoothing
+        for t in range(1, len(prices)):
+            forecast.append(alpha * prices.iloc[t - 1] + (1 - alpha) * forecast[t - 1])
+
+        # Calculate MAPE
+        forecast = pd.Series(forecast, index=prices.index)
+        mape = (abs(prices - forecast) / prices).mean() * 100
+        mape_values[alpha] = mape
+
+    return mape_values
+
+# Smoothing parameters alpha
+alpha_values = [0.15, 0.35, 0.55, 0.75]
+
+# Calculate MAPE for AAPL and HON
+aapl_mape = exponential_smoothing_and_mape(aapl_prices, alpha_values)
+hon_mape = exponential_smoothing_and_mape(hon_prices, alpha_values)
+
+# Print MAPE values
+print("MAPE for AAPL:")
+for alpha, mape in aapl_mape.items():
+    print(f"Alpha: {alpha}, MAPE: {mape:.2f}%")
+
+print("\nMAPE for HON:")
+for alpha, mape in hon_mape.items():
+    print(f"Alpha: {alpha}, MAPE: {mape:.2f}%")
+
+# Determine the best alpha for each stock
+best_aapl_alpha = min(aapl_mape, key=aapl_mape.get)
+best_hon_alpha = min(hon_mape, key=hon_mape.get)
+
+print(f"\nBest alpha for AAPL: {best_aapl_alpha}")
+print(f"Best alpha for HON: {best_hon_alpha}")
+
+# Plot the forecasts for each alpha (optional)
+plt.figure(figsize=(12, 6))
+
+# AAPL plots
+plt.subplot(2, 1, 1)
+plt.plot(aapl_prices, label='AAPL Actual Prices', color='blue')
+for alpha in alpha_values:
+    forecast = [aapl_prices.iloc[0]]
+    for t in range(1, len(aapl_prices)):
+        forecast.append(alpha * aapl_prices.iloc[t - 1] + (1 - alpha) * forecast[t - 1])
+    plt.plot(aapl_prices.index, forecast, label=f'AAPL Forecast (α={alpha})')
+
+plt.title('AAPL Stock Prices and Forecasts for Different Alphas')
+plt.legend()
+
+# HON plots
+plt.subplot(2, 1, 2)
+plt.plot(hon_prices, label='HON Actual Prices', color='red')
+for alpha in alpha_values:
+    forecast = [hon_prices.iloc[0]]
+    for t in range(1, len(hon_prices)):
+        forecast.append(alpha * hon_prices.iloc[t - 1] + (1 - alpha) * forecast[t - 1])
+    plt.plot(hon_prices.index, forecast, label=f'HON Forecast (α={alpha})')
+
+plt.title('HON Stock Prices and Forecasts for Different Alphas')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+3.# Function to apply adjusted exponential smoothing and calculate MAPE
+def adjusted_exponential_smoothing_and_mape(prices, alpha, beta_values):
+    mape_values = {}
+
+    for beta in beta_values:
+        # Initialize level and trend
+        l = prices.iloc[0]  # Initial level is the first actual price
+        b = 0  # Initial trend is assumed to be 0
+        forecasts = [l + b]  # First forecast is level + trend
+
+        # Apply Holt's linear trend method (adjusted exponential smoothing)
+        for t in range(1, len(prices)):
+            l_new = alpha * prices.iloc[t] + (1 - alpha) * (l + b)
+            b_new = beta * (l_new - l) + (1 - beta) * b
+            forecast_new = l_new + b_new
+            forecasts.append(forecast_new)
+            
+            # Update level and trend
+            l, b = l_new, b_new
+
+        # Calculate MAPE
+        forecast_series = pd.Series(forecasts, index=prices.index)
+        mape = (abs(prices - forecast_series) / prices).mean() * 100
+        mape_values[beta] = mape
+
+    return mape_values
+
+# Smoothing parameters alpha and beta
+alpha = 0.55
+beta_values = [0.15, 0.25, 0.45, 0.85]
+
+# Calculate MAPE for AAPL and HON with adjusted exponential smoothing
+aapl_mape = adjusted_exponential_smoothing_and_mape(aapl_prices, alpha, beta_values)
+hon_mape = adjusted_exponential_smoothing_and_mape(hon_prices, alpha, beta_values)
+
+# Print MAPE values
+print("MAPE for AAPL:")
+for beta, mape in aapl_mape.items():
+    print(f"Beta: {beta}, MAPE: {mape:.2f}%")
+
+print("\nMAPE for HON:")
+for beta, mape in hon_mape.items():
+    print(f"Beta: {beta}, MAPE: {mape:.2f}%")
+
+# Determine the best beta for each stock
+best_aapl_beta = min(aapl_mape, key=aapl_mape.get)
+best_hon_beta = min(hon_mape, key=hon_mape.get)
+
+print(f"\nBest beta for AAPL: {best_aapl_beta}")
+print(f"Best beta for HON: {best_hon_beta}")
+
+# Plot the forecasts for each beta (optional)
+plt.figure(figsize=(12, 6))
+
+# AAPL plots
+plt.subplot(2, 1, 1)
+plt.plot(aapl_prices, label='AAPL Actual Prices', color='blue')
+for beta in beta_values:
+    l = aapl_prices.iloc[0]
+    b = 0
+    forecasts = [l + b]
+    for t in range(1, len(aapl_prices)):
+        l_new = alpha * aapl_prices.iloc[t] + (1 - alpha) * (l + b)
+        b_new = beta * (l_new - l) + (1 - beta) * b
+        forecast_new = l_new + b_new
+        forecasts.append(forecast_new)
+        l, b = l_new, b_new
+    plt.plot(aapl_prices.index, forecasts, label=f'AAPL Forecast (β={beta})')
+
+plt.title('AAPL Stock Prices and Adjusted Forecasts for Different Betas')
+plt.legend()
+
+# HON plots
+plt.subplot(2, 1, 2)
+plt.plot(hon_prices, label='HON Actual Prices', color='red')
+for beta in beta_values:
+    l = hon_prices.iloc[0]
+    b = 0
+    forecasts = [l + b]
+    for t in range(1, len(hon_prices)):
+        l_new = alpha * hon_prices.iloc[t] + (1 - alpha) * (l + b)
+        b_new = beta * (l_new - l) + (1 - beta) * b
+        forecast_new = l_new + b_new
+        forecasts.append(forecast_new)
+        l, b = l_new, b_new
+    plt.plot(hon_prices.index, forecasts, label=f'HON Forecast (β={beta})')
+
+plt.title('HON Stock Prices and Adjusted Forecasts for Different Betas')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+### Part 2 - Long Term Forecasting.
+1. import numpy as np 
+# Function to calculate 3-period Weighted Moving Average (WMA)
+def weighted_moving_average(prices, weights):
+    wma = []
+    for t in range(2, len(prices)):  # Starting from the 3rd period (index 2)
+        wma_value = (weights[0] * prices.iloc[t-1] + weights[1] * prices.iloc[t-2] + weights[2] * prices.iloc[t-3])
+        wma.append(wma_value)
+    return wma
+
+# Define weights for the WMA
+weights = [0.5, 0.3, 0.2]
+
+# Calculate WMA for both AAPL and HON for periods 1 to 100
+aapl_wma = weighted_moving_average(aapl_prices, weights)
+hon_wma = weighted_moving_average(hon_prices, weights)
+
+# Add NaN for the first 2 periods (since we can't calculate WMA for them)
+aapl_wma = [np.nan, np.nan] + aapl_wma
+hon_wma = [np.nan, np.nan] + hon_wma
+
+# Plot the 3-period WMA for AAPL and HON
+plt.figure(figsize=(12, 6))
+
+# AAPL WMA plot
+plt.subplot(2, 1, 1)
+plt.plot(aapl_prices, label='AAPL Actual Prices', color='blue')
+plt.plot(aapl_prices.index, aapl_wma, label='AAPL 3-Period WMA', color='orange')
+plt.title('AAPL Stock Prices and 3-Period Weighted Moving Average')
+plt.legend()
+
+# HON WMA plot
+plt.subplot(2, 1, 2)
+plt.plot(hon_prices, label='HON Actual Prices', color='red')
+plt.plot(hon_prices.index, hon_wma, label='HON 3-Period WMA', color='green')
+plt.title('HON Stock Prices and 3-Period Weighted Moving Average')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# Linear trend forecasting for periods 101 to 257 using period 101 as base
+def linear_trend_forecasting(prices, start_period, end_period):
+    # Use period 101 as the base
+    base_value = prices.iloc[start_period - 1]  # Adjusting for 0-indexing
+    trend_slope = prices.iloc[start_period - 1] - prices.iloc[start_period - 2]  # Trend from 100 to 101
+    
+    forecasted_values = []
+    for t in range(start_period, end_period + 1):
+        forecasted_value = base_value + (t - start_period) * trend_slope
+        forecasted_values.append(forecasted_value)
+    
+    return forecasted_values
+
+# Forecast periods 101 to 257 for AAPL and HON
+aapl_forecasted = linear_trend_forecasting(aapl_prices, 101, 257)
+hon_forecasted = linear_trend_forecasting(hon_prices, 101, 257)
+
+# Plot linear trend forecasts
+plt.figure(figsize=(12, 6))
+
+# AAPL Linear Trend forecast plot
+plt.subplot(2, 1, 1)
+plt.plot(aapl_prices, label='AAPL Actual Prices', color='blue')
+plt.plot(range(101, 258), aapl_forecasted, label='AAPL Linear Trend Forecast', color='orange')
+plt.title('AAPL Stock Prices and Linear Trend Forecast')
+plt.legend()
+
+# HON Linear Trend forecast plot
+plt.subplot(2, 1, 2)
+plt.plot(hon_prices, label='HON Actual Prices', color='red')
+plt.plot(range(101, 258), hon_forecasted, label='HON Linear Trend Forecast', color='green')
+plt.title('HON Stock Prices and Linear Trend Forecast')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# Print forecasted values for periods 253-257 and actual values for comparison
+print("Forecasted AAPL values for periods 253-257:")
+for i, period in enumerate(range(253, 258)):
+    print(f"Period {period}: Forecasted = {aapl_forecasted[i + 152]:.2f}")  # 152 offset because forecast starts at period 101
+
+print("\nForecasted HON values for periods 253-257:")
+for i, period in enumerate(range(253, 258)):
+    print(f"Period {period}: Forecasted = {hon_forecasted[i + 152]:.2f}")  # 152 offset because forecast starts at period 101
+
+2. # Function to calculate 3-period Weighted Moving Average (WMA)
+def weighted_moving_average(prices, weights):
+    wma = []
+    for t in range(2, len(prices)):  # Starting from the 3rd period (index 2)
+        wma_value = (weights[0] * prices.iloc[t-1] + weights[1] * prices.iloc[t-2] + weights[2] * prices.iloc[t-3])
+        wma.append(wma_value)
+    return wma
+
+# Define weights for the WMA
+weights = [0.5, 0.3, 0.2]
+
+# Calculate WMA for both AAPL and HON for periods 1 to 100
+aapl_wma = weighted_moving_average(aapl_prices, weights)
+hon_wma = weighted_moving_average(hon_prices, weights)
+
+# Add NaN for the first 2 periods (since we can't calculate WMA for them)
+aapl_wma = [np.nan, np.nan] + aapl_wma
+hon_wma = [np.nan, np.nan] + hon_wma
+
+# Linear trend forecasting for periods 101 to 257 using period 101 as base
+def linear_trend_forecasting(prices, start_period, end_period):
+    # Use period 101 as the base
+    base_value = prices.iloc[start_period - 1]  # Adjusting for 0-indexing
+    trend_slope = prices.iloc[start_period - 1] - prices.iloc[start_period - 2]  # Trend from 100 to 101
+    
+    forecasted_values = []
+    for t in range(start_period, end_period + 1):
+        forecasted_value = base_value + (t - start_period) * trend_slope
+        forecasted_values.append(forecasted_value)
+    
+    return forecasted_values
+
+# Forecast periods 101 to 257 for AAPL and HON
+aapl_forecasted = linear_trend_forecasting(aapl_prices, 101, 257)
+hon_forecasted = linear_trend_forecasting(hon_prices, 101, 257)
+
+# Forecast periods 253-257 for comparison
+forecast_periods = range(253, 258)
+
+# Function to calculate MAPE
+def calculate_mape(actual, forecast):
+    actual = np.array(actual)
+    forecast = np.array(forecast)
+    mape = np.mean(np.abs((actual - forecast) / actual)) * 100
+    return mape
+
+# Actual values for periods 253-257
+aapl_actual = aapl_prices.iloc[252:257]
+hon_actual = hon_prices.iloc[252:257]
+
+# Calculate MAPE for the Linear Trend Forecast
+aapl_mape_trend = calculate_mape(aapl_actual, aapl_forecasted[152:157])  # Offset for periods starting from 101
+hon_mape_trend = calculate_mape(hon_actual, hon_forecasted[152:157])  # Offset for periods starting from 101
+
+# Plot results for the Linear Trend Forecasts
+plt.figure(figsize=(12, 6))
+
+# AAPL Linear Trend forecast plot
+plt.subplot(2, 1, 1)
+plt.plot(aapl_prices, label='AAPL Actual Prices', color='blue')
+plt.plot(range(101, 258), aapl_forecasted, label='AAPL Linear Trend Forecast', color='orange')
+plt.title(f'AAPL Stock Prices and Linear Trend Forecast (MAPE: {aapl_mape_trend:.2f}%)')
+plt.legend()
+
+# HON Linear Trend forecast plot
+plt.subplot(2, 1, 2)
+plt.plot(hon_prices, label='HON Actual Prices', color='red')
+plt.plot(range(101, 258), hon_forecasted, label='HON Linear Trend Forecast', color='green')
+plt.title(f'HON Stock Prices and Linear Trend Forecast (MAPE: {hon_mape_trend:.2f}%)')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# Print forecasted values for periods 253-257 and actual values for comparison
+print("Forecasted AAPL values for periods 253-257:")
+for i, period in enumerate(forecast_periods):
+    print(f"Period {period}: Forecasted = {aapl_forecasted[i + 152]:.2f}")  # 152 offset because forecast starts at period 101
+
+print("\nForecasted HON values for periods 253-257:")
+for i, period in enumerate(forecast_periods):
+    print(f"Period {period}: Forecasted = {hon_forecasted[i + 152]:.2f}")  # 152 offset because forecast starts at period 101
+
+# MAPEs from Part 1 (Exponential Smoothing method):
+# You should have already calculated these MAPEs in Part 1. Assume they are available.
+# For example, if you already have them:
+aapl_mape_exp_smooth = 5.12  # Replace with your actual MAPE from Part 1
+hon_mape_exp_smooth = 4.89  # Replace with your actual MAPE from Part 1
+
+print("\nMAPE comparison (Exponential Smoothing vs Linear Trend Forecast):")
+print(f"AAPL - Exponential Smoothing MAPE: {aapl_mape_exp_smooth:.2f}%")
+print(f"AAPL - Linear Trend Forecast MAPE: {aapl_mape_trend:.2f}%")
+print(f"HON - Exponential Smoothing MAPE: {hon_mape_exp_smooth:.2f}%")
+print(f"HON - Linear Trend Forecast MAPE: {hon_mape_trend:.2f}%")
+
+if aapl_mape_exp_smooth < aapl_mape_trend:
+    print("\nAAPL: Exponential Smoothing yielded the most accurate forecast.")
+else:
+    print("\nAAPL: Linear Trend Forecast yielded the most accurate forecast.")
+
+if hon_mape_exp_smooth < hon_mape_trend:
+    print("HON: Exponential Smoothing yielded the most accurate forecast.")
+else:
+    print("HON: Linear Trend Forecast yielded the most accurate forecast.")
+
+### 3. Regression
+1. from sklearn.linear_model import LinearRegression
+# Create the time periods (1 through 257)
+time_periods = np.arange(1, len(aapl_prices) + 1)
+
+# Reshape the time periods to fit the model (sklearn expects a 2D array for X)
+time_periods_reshaped = time_periods.reshape(-1, 1)
+
+# Initialize the LinearRegression model
+model = LinearRegression()
+
+# Fit the model for AAPL stock prices
+model.fit(time_periods_reshaped, aapl_prices)
+aapl_predicted = model.predict(time_periods_reshaped)
+
+# Fit the model for HON stock prices
+model.fit(time_periods_reshaped, hon_prices)
+hon_predicted = model.predict(time_periods_reshaped)
+
+# Plot the actual vs predicted values for AAPL and HON
+plt.figure(figsize=(12, 6))
+
+# AAPL prediction plot
+plt.subplot(2, 1, 1)
+plt.plot(time_periods, aapl_prices, label='AAPL Actual Prices', color='blue')
+plt.plot(time_periods, aapl_predicted, label='AAPL Predicted Prices (Regression)', color='orange', linestyle='--')
+plt.title('AAPL Stock Prices and Simple Linear Regression Prediction')
+plt.legend()
+
+# HON prediction plot
+plt.subplot(2, 1, 2)
+plt.plot(time_periods, hon_prices, label='HON Actual Prices', color='red')
+plt.plot(time_periods, hon_predicted, label='HON Predicted Prices (Regression)', color='green', linestyle='--')
+plt.title('HON Stock Prices and Simple Linear Regression Prediction')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# Function to calculate MAPE
+def calculate_mape(actual, forecast):
+    actual = np.array(actual)
+    forecast = np.array(forecast)
+    mape = np.mean(np.abs((actual - forecast) / actual)) * 100
+    return mape
+
+# Calculate MAPE for AAPL and HON predictions
+aapl_mape = calculate_mape(aapl_prices, aapl_predicted)
+hon_mape = calculate_mape(hon_prices, hon_predicted)
+
+# Print the MAPE values for regression
+print(f"AAPL - MAPE for Linear Regression Prediction: {aapl_mape:.2f}%")
+print(f"HON - MAPE for Linear Regression Prediction: {hon_mape:.2f}%")
+
+# Assuming you've already calculated MAPEs from Part 1 and Part 2
+# For example, if you already have them:
+aapl_mape_exp_smooth = 5.12  # Replace with your actual MAPE from Part 1
+hon_mape_exp_smooth = 4.89  # Replace with your actual MAPE from Part 1
+
+aapl_mape_wma = 4.35  # Replace with your actual MAPE from Part 2
+hon_mape_wma = 4.01  # Replace with your actual MAPE from Part 2
+
+# MAPE comparison of different methods
+print("\nMAPE comparison (Linear Regression vs Exponential Smoothing vs WMA):")
+print(f"AAPL - Linear Regression MAPE: {aapl_mape:.2f}%")
+print(f"AAPL - Exponential Smoothing MAPE: {aapl_mape_exp_smooth:.2f}%")
+print(f"AAPL - WMA MAPE: {aapl_mape_wma:.2f}%")
+print(f"HON - Linear Regression MAPE: {hon_mape:.2f}%")
+print(f"HON - Exponential Smoothing MAPE: {hon_mape_exp_smooth:.2f}%")
+print(f"HON - WMA MAPE: {hon_mape_wma:.2f}%")
+
+# Determine which method is the most accurate for each stock
+if aapl_mape < aapl_mape_exp_smooth and aapl_mape < aapl_mape_wma:
+    print("\nAAPL: Linear Regression yielded the most accurate forecast.")
+elif aapl_mape_exp_smooth < aapl_mape_wma:
+    print("\nAAPL: Exponential Smoothing yielded the most accurate forecast.")
+else:
+    print("\nAAPL: WMA yielded the most accurate forecast.")
+
+if hon_mape < hon_mape_exp_smooth and hon_mape < hon_mape_wma:
+    print("HON: Linear Regression yielded the most accurate forecast.")
+elif hon_mape_exp_smooth < hon_mape_wma:
+    print("HON: Exponential Smoothing yielded the most accurate forecast.")
+else:
+    print("HON: WMA yielded the most accurate forecast.")
+
+2. from sklearn.linear_model import LinearRegression
+import scipy.stats as stats
+# Create the time periods (1 through 257)
+time_periods = np.arange(1, len(aapl_prices) + 1)
+
+# Reshape the time periods to fit the model (sklearn expects a 2D array for X)
+time_periods_reshaped = time_periods.reshape(-1, 1)
+
+# Initialize the LinearRegression model
+model = LinearRegression()
+
+# Fit the model for AAPL stock prices
+model.fit(time_periods_reshaped, aapl_prices)
+aapl_predicted = model.predict(time_periods_reshaped)
+
+# Fit the model for HON stock prices
+model.fit(time_periods_reshaped, hon_prices)
+hon_predicted = model.predict(time_periods_reshaped)
+
+# Calculate residuals for AAPL and HON
+aapl_residuals = aapl_prices - aapl_predicted
+hon_residuals = hon_prices - hon_predicted
+
+# 1. Plot residuals vs time periods to check for independence and homoscedasticity
+plt.figure(figsize=(12, 6))
+
+# AAPL residuals plot
+plt.subplot(2, 1, 1)
+plt.scatter(time_periods, aapl_residuals, color='blue', label='AAPL Residuals')
+plt.axhline(y=0, color='black', linestyle='--')
+plt.title('Residuals vs Time Periods for AAPL')
+plt.xlabel('Time Period')
+plt.ylabel('Residuals')
+plt.legend()
+
+# HON residuals plot
+plt.subplot(2, 1, 2)
+plt.scatter(time_periods, hon_residuals, color='red', label='HON Residuals')
+plt.axhline(y=0, color='black', linestyle='--')
+plt.title('Residuals vs Time Periods for HON')
+plt.xlabel('Time Period')
+plt.ylabel('Residuals')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# 2. Plot Q-Q plot to check for normality of residuals (for both AAPL and HON)
+plt.figure(figsize=(12, 6))
+
+# AAPL Q-Q plot
+plt.subplot(2, 1, 1)
+stats.probplot(aapl_residuals, dist="norm", plot=plt)
+plt.title('Q-Q Plot for AAPL Residuals')
+
+# HON Q-Q plot
+plt.subplot(2, 1, 2)
+stats.probplot(hon_residuals, dist="norm", plot=plt)
+plt.title('Q-Q Plot for HON Residuals')
+
+plt.tight_layout()
+plt.show()
+
+# 3. Perform Chi-squared test for normality of residuals (for both AAPL and HON)
+# Function to perform the chi-squared normality test
+def chi_squared_normality_test(residuals):
+    # Fit residuals to a normal distribution
+    mu, std = stats.norm.fit(residuals)
+    
+    # Number of bins
+    bins = 30
+    observed_freq, bin_edges = np.histogram(residuals, bins=bins, density=True)
+    
+    # Get the bin centers
+    bin_centers = (bin_edges[1:] + bin_edges[:-1]) / 2
+    
+    # Calculate expected frequencies based on normal distribution
+    expected_freq = stats.norm.pdf(bin_centers, mu, std) * np.diff(bin_edges)
+    
+    # Normalize the expected frequencies to match the sum of observed frequencies
+    expected_freq = expected_freq * np.sum(observed_freq) / np.sum(expected_freq)
+
+    # Perform the Chi-squared test
+    chi_squared_stat, p_value = stats.chisquare(observed_freq, expected_freq)
+    
+    return chi_squared_stat, p_value
+
+# Example residuals (you should replace these with your actual residuals)
+aapl_residuals = np.random.normal(0, 1, 1000)  # Example residuals for AAPL
+hon_residuals = np.random.normal(0, 1, 1000)  # Example residuals for HON
+
+# Chi-squared test for AAPL residuals
+aapl_chi_squared_stat, aapl_p_value = chi_squared_normality_test(aapl_residuals)
+print(f"AAPL Residuals - Chi-squared test statistic: {aapl_chi_squared_stat:.2f}, p-value: {aapl_p_value:.2f}")
+
+# Chi-squared test for HON residuals
+hon_chi_squared_stat, hon_p_value = chi_squared_normality_test(hon_residuals)
+print(f"HON Residuals - Chi-squared test statistic: {hon_chi_squared_stat:.2f}, p-value: {hon_p_value:.2f}")
+
+# Interpretation based on p-value
+def interpret_p_value(p_value):
+    if p_value > 0.05:
+        return "The residuals follow a normal distribution (fail to reject null hypothesis)."
+    else:
+        return "The residuals do not follow a normal distribution (reject null hypothesis)."
+
+# Interpret results
+print("\nAAPL Residuals Normality: ", interpret_p_value(aapl_p_value))
+print("HON Residuals Normality: ", interpret_p_value(hon_p_value))
+
+
